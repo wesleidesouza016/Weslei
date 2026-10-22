@@ -67,7 +67,14 @@ main{max-width:1100px;margin:auto;padding:0 20px 34px;display:grid;grid-template
   $('tab-help').addEventListener('click',()=>{$('tab-help').classList.add('active');$('tab-moves').classList.remove('active');$('moves-view').hidden=true;$('help-view').hidden=false;});
   $('cancel-promotion').addEventListener('click',()=>{$('promotion').classList.remove('open');pendingPromotion=null;});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingPromotion){$('promotion').classList.remove('open');pendingPromotion=null;}});
-  if(typeof Chess==='undefined'){$('status-text').textContent='Não foi possível carregar as regras de xadrez. Verifique sua conexão com a internet e recarregue a página.';$('new-game').disabled=true;}else init();
+  if(typeof Chess!=='undefined'){init();}else{
+    $('status-text').textContent='Carregando as regras do xadrez…';
+    const fallback=document.createElement('script');
+    fallback.src='https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js';
+    fallback.onload=()=>{if(typeof Chess!=='undefined'){$('new-game').disabled=false;init();}else{$('status-text').textContent='Não foi possível carregar as regras. Confira a internet e recarregue a página.';$('new-game').disabled=true;}};
+    fallback.onerror=()=>{$('status-text').textContent='Não foi possível carregar as regras. Confira a internet e recarregue a página.';$('new-game').disabled=true;};
+    document.head.appendChild(fallback);
+  }
 })();
 </script>
 </body>
