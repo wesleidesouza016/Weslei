@@ -24,3 +24,7 @@ No repositório, entre em **Settings → Pages**, escolha **Deploy from a branch
 
 ---
 Feito com carinho para o projeto Weslei.
+
+
+## Publicação automática
+O GitHub Actions está configurado para ativar o GitHub Pages e publicar o site a cada atualização da branch `main`.
