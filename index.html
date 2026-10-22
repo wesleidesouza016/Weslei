@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#101827">
+<title>FlipBird — Voe longe!</title>
+<style>
+:root{color-scheme:dark;--ink:#f7f8ff;--muted:#b7c5df;--gold:#ffd166}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#101827;color:var(--ink)}
+body{display:grid;place-items:center;min-height:100svh;padding:14px;overflow:hidden}
+.app{width:min(100%,480px);text-align:center}
+header{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 10px}
+.logo{font-size:34px;filter:drop-shadow(0 4px 0 #0003)}
+h1{font-size:clamp(1.6rem,7vw,2.2rem);margin:0;letter-spacing:-.05em}
+header p{margin:1px 0 0;color:var(--muted);font-size:.9rem}
+.hud{display:flex;justify-content:space-between;align-items:center;margin:0 2px 8px;gap:10px}
+.pill{background:#202d43;border:1px solid #34445e;border-radius:999px;padding:7px 13px;font-weight:750;font-size:.9rem}
+#best{color:var(--gold)}
+.game-wrap{position:relative;width:100%;aspect-ratio:360/540;border:3px solid #34445e;border-radius:20px;overflow:hidden;box-shadow:0 18px 50px #0006;background:#9be7ff;touch-action:manipulation}
+canvas{display:block;width:100%;height:100%;touch-action:manipulation}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;padding:22px;background:#10182777;backdrop-filter:blur(3px)}
+.overlay.hidden{display:none}
+.card{width:min(100%,300px);padding:22px 18px;border-radius:22px;background:#162238ed;border:1px solid #ffffff35;box-shadow:0 12px 30px #0004}
+.card h2{font-size:1.65rem;margin:0 0 8px}
+.card p{color:#d4e0f5;line-height:1.5;margin:0 0 17px}
+button{font:inherit;font-weight:800;border:0;border-radius:14px;padding:12px 17px;background:var(--gold);color:#252b39;cursor:pointer;box-shadow:0 4px 0 #c18f36;touch-action:manipulation}
+button:active{transform:translateY(2px);box-shadow:0 2px 0 #c18f36}
+.hint{color:var(--muted);font-size:.88rem;margin:12px 0 0;line-height:1.5}
+.controls{display:flex;gap:8px;justify-content:center;margin-top:10px}
+.controls button{flex:1;max-width:180px}
+@media(min-height:850px){.app{width:min(100%,440px)}}
+</style>
+</head>
+<body>
+<div class="app">
+<header><div class="logo" aria-hidden="true">🐤</div><div><h1>FlipBird</h1><p>Um toque, uma batida de asas!</p></div></header>
+<div class="hud"><div class="pill">⭐ Pontos: <span id="score">0</span></div><div class="pill" id="best">🏆 Recorde: 0</div></div>
+<div class="game-wrap" id="gameWrap">
+<canvas id="game" width="360" height="540" aria-label="Jogo FlipBird. Toque para fazer o passarinho voar."></canvas>
+<div class="overlay" id="overlay"><div class="card"><h2 id="title">Pronto pra voar?</h2><p id="message">Passe entre os canos e tente bater seu recorde!</p><button id="start">Jogar agora ▶</button></div></div>
+</div>
+<div class="controls"><button id="sound" type="button">🔊 Som ligado</button><button id="restart" type="button">↻ Reiniciar</button></div>
+<p class="hint">Toque na tela ou aperte <strong>ESPAÇO</strong> para bater as asas.<br>Evite os canos e não deixe o passarinho cair! 🪽</p>
+</div>
+<script>
+(()=>{'use strict';
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id);
+const W=360,H=540,ground=54,bird={x:92,y:235,vy:0,r:14,rot:0};
+let pipes=[],score=0,best=0,frame=0,state='ready',soundOn=true,audio=null;
+try{best=Number(localStorage.getItem('flipbird-best')||0)}catch(e){}
+$('best').textContent='🏆 Recorde: '+best;
+function beep(freq=520,duration=.07){if(!soundOn)return;try{const A=window.AudioContext||window.webkitAudioContext;if(!A)return;audio=audio||new A();if(audio.state==='suspended')audio.resume();const o=audio.createOscillator(),g=audio.createGain();o.type='sine';o.frequency.value=freq;g.gain.setValueAtTime(.055,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+duration);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+duration)}catch(e){}}
+function reset(){bird.y=235;bird.vy=0;bird.rot=0;pipes=[];score=0;frame=0;$('score').textContent='0';state='ready';draw();showOverlay('Pronto pra voar?','Passe entre os canos e tente bater seu recorde!','Jogar agora ▶')}
+function showOverlay(title,msg,button){$('title').textContent=title;$('message').textContent=msg;$('start').textContent=button;$('overlay').classList.remove('hidden')}
+function hideOverlay(){$('overlay').classList.add('hidden')}
+function start(){if(state==='over')reset();state='playing';bird.vy=-6.4;hideOverlay();beep(650)}
+function flap(){if(state==='ready'||state==='over'){start();return}if(state==='playing'){bird.vy=-6.2;beep(570,.055)}}
+function addPipe(){const gap=148,top=72+Math.random()*235;pipes.push({x:W+10,top,bottom:top+gap,w:58,passed:false})}
+function rounded(x,y,w,h,r){if(w<=0||h<=0)return;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()}
+function drawBackground(){const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#78d9ff');g.addColorStop(1,'#d6f7ff');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ctx.fillStyle='#ffffff99';[[55,75,22],[220,120,28],[310,58,18]].forEach(([x,y,r])=>{ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.arc(x+r,y-8,r*.8,0,Math.PI*2);ctx.arc(x+r*1.8,y,r*.7,0,Math.PI*2);ctx.fill()});
+ctx.fillStyle='#9be4a3';ctx.beginPath();ctx.moveTo(0,390);ctx.quadraticCurveTo(70,340,140,395);ctx.quadraticCurveTo(245,325,360,390);ctx.lineTo(360,H);ctx.lineTo(0,H);ctx.fill();
+ctx.fillStyle='#72cb83';ctx.beginPath();ctx.moveTo(0,430);ctx.quadraticCurveTo(100,385,195,435);ctx.quadraticCurveTo(280,395,360,425);ctx.lineTo(360,H);ctx.lineTo(0,H);ctx.fill()}
+function drawPipe(p){const grad=ctx.createLinearGradient(p.x,0,p.x+p.w,0);grad.addColorStop(0,'#25864e');grad.addColorStop(.45,'#61d66e');grad.addColorStop(1,'#1b7044');ctx.fillStyle=grad;
+rounded(p.x,0,p.w,p.top-13,7);rounded(p.x-5,p.top-18,p.w+10,18,5);rounded(p.x,p.bottom+13,p.w,H-ground-p.bottom-13,7);rounded(p.x-5,p.bottom,p.w+10,18,5);
+ctx.fillStyle='#ffffff40';ctx.fillRect(p.x+9,4,5,Math.max(0,p.top-25));ctx.fillRect(p.x+9,p.bottom+28,5,Math.max(0,H-ground-p.bottom-38))}
+function drawBird(){ctx.save();ctx.translate(bird.x,bird.y);ctx.rotate(bird.rot);ctx.fillStyle='#f4ad36';ctx.beginPath();ctx.ellipse(-2,3,15,12,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffdb67';ctx.beginPath();ctx.ellipse(-5,1,10,8,-.25,0,Math.PI*2);ctx.fill();ctx.fillStyle='#e98c25';ctx.beginPath();ctx.ellipse(-7,7,8,5,Math.sin(frame*.3)*.3,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(6,-5,5.5,0,Math.PI*2);ctx.fill();ctx.fillStyle='#1d2735';ctx.beginPath();ctx.arc(8,-5,2.5,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ff794b';ctx.beginPath();ctx.moveTo(12,0);ctx.lineTo(23,4);ctx.lineTo(12,7);ctx.closePath();ctx.fill();ctx.restore()}
+function drawGround(){ctx.fillStyle='#f7df9a';ctx.fillRect(0,H-ground,W,ground);ctx.fillStyle='#55bc68';ctx.fillRect(0,H-ground,W,10);ctx.fillStyle='#caa56b';for(let x=-(frame*2%24);x<W;x+=24){ctx.fillRect(x,H-ground+20,13,5);ctx.fillRect(x+8,H-ground+35,10,4)}}
+function draw(){drawBackground();pipes.forEach(drawPipe);drawGround();drawBird()}
+function hit(p){const bx=bird.x,by=bird.y,r=bird.r-3;return bx+r>p.x&&bx-r<p.x+p.w&&(by-r<p.top||by+r>p.bottom)}
+function endGame(){state='over';beep(170,.22);const record=score>best;if(record){best=score;$('best').textContent='🏆 Recorde: '+best;try{localStorage.setItem('flipbird-best',String(best))}catch(e){}}showOverlay('Fim de jogo! 💥','Você fez '+score+' ponto'+(score===1?'':'s')+'! '+(record?'Novo recorde!':'Tente mais uma vez!'),'Jogar de novo ↻')}
+function loop(){if(state==='playing'){frame++;bird.vy+=.34;bird.y+=bird.vy;bird.rot=Math.min(.9,Math.max(-.45,bird.vy*.08));if(frame%94===1)addPipe();pipes.forEach(p=>{p.x-=2.55;if(!p.passed&&p.x+p.w<bird.x){p.passed=true;score++;$('score').textContent=score;beep(850,.09)}});pipes=pipes.filter(p=>p.x+p.w>-10);if(bird.y+bird.r>H-ground||bird.y-bird.r<0||pipes.some(hit))endGame()}else{frame++;if(state==='ready'){bird.y=235+Math.sin(frame*.08)*7;bird.rot=Math.sin(frame*.08)*.04}}draw();requestAnimationFrame(loop)}
+canvas.addEventListener('pointerdown',e=>{e.preventDefault();flap()});$('start').addEventListener('click',e=>{e.stopPropagation();start()});$('restart').addEventListener('click',()=>{reset();start()});$('sound').addEventListener('click',()=>{soundOn=!soundOn;$('sound').textContent=soundOn?'🔊 Som ligado':'🔇 Som desligado';if(soundOn)beep()});document.addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='ArrowUp'){e.preventDefault();if(!e.repeat)flap()}if(e.code==='Enter'&&state!=='playing')start()});
+reset();requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
